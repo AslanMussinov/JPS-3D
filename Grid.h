@@ -28,14 +28,23 @@ struct FGrid
 		finish = p;
 	}
 
+#pragma region Operator()
+
 	inline bool operator()(unsigned xx, unsigned yy, unsigned zz) const
 	{
 		if (xx < x && yy < y && zz < z)
 		{
-			return lines[xx][yy][zz];
+			return lines[xx][yy][zz] != 0;
 		}
 		return false;
 	}
+
+	inline bool operator()(FPosition p) const
+	{
+		return operator()(p.x, p.y, p.z);
+	}
+
+#pragma endregion
 
 };
 

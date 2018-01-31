@@ -11,9 +11,20 @@ struct FPosition
 
 	FPosition(unsigned xx, unsigned yy, unsigned zz) : x(xx), y(yy), z(zz) {}
 
-	inline bool IsValid()
+	inline bool IsValid() const
 	{
 		return x != unsigned(-1);
+	}
+
+	inline void Normalize(unsigned n)
+	{
+		if (n < 2U)
+		{
+			return;
+		}
+		x = (x / n) * n;
+		y = (y / n) * n;
+		z = (z / n) * n;
 	}
 };
 

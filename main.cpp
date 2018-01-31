@@ -1,13 +1,13 @@
 #include <iostream>
 
-#include "Node.h"
-#include "Openlist.h"
+#include "Searcher.h"
 
 int main()
 {
-	Node n = Node(FPosition(1, 2, 3));
-	n.SetOpen();
-	std::cout << n.IsClosed() << '\n';
+	unsigned x = 10;
+	unsigned y = 20;
+	int z = x - y;
+	std::cout << z << '\n';
 
 	return 0;
 }

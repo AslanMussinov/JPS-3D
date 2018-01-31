@@ -8,9 +8,9 @@ class Node
 
 public:
 
-	Node(const FPosition & p) : F(0ull), G(0ull), pos(p), parent(NULL), flag(0) {}
+	Node(const FPosition & p) : F(0U), G(0U), pos(p), parent(NULL), flag(0) {}
 
-	uint64_t F, G;
+	unsigned F, G;
 	const FPosition pos;
 	const Node * parent;
 
@@ -40,10 +40,10 @@ public:
 
 	inline void ResetState()
 	{
-		F = 0ull;
-		G = 0ull;
+		F = 0U;
+		G = 0U;
 		parent = NULL;
-		flag = 0;
+		flag = uint8_t(0);
 	}
 
 private:

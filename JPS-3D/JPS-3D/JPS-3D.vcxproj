@@ -145,10 +145,12 @@
     <ClCompile Include="..\..\main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\EDiagonalMovement.h" />
     <ClInclude Include="..\..\Grid.h" />
     <ClInclude Include="..\..\Node.h" />
     <ClInclude Include="..\..\Openlist.h" />
     <ClInclude Include="..\..\Position.h" />
+    <ClInclude Include="..\..\Searcher.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
