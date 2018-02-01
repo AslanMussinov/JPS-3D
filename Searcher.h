@@ -53,7 +53,7 @@ class Searcher
 
 public:
 
-	Searcher(FGrid& g, DiagonalMovement d = DiagonalMovement::AtLeastOnePassable) : grid(g), dMove(d), finishNode(NULL), skip(1U), stepsTotal(0U) {}
+	Searcher(FGrid& g, DiagonalMovement d = DiagonalMovement::Always) : grid(g), dMove(d), finishNode(NULL), skip(1U), stepsTotal(0U) {}
 
 	void FreeMemory()
 	{
@@ -200,27 +200,476 @@ inline bool Searcher::checkD(const int x, const int y, const int z, const int dx
 }
 
 #pragma region Jumps
-
+// partially ready
 inline FPosition Searcher::jumpXYZ(FPosition p, const int dx, const int dy, const int dz)
 {
-	return FPosition();
+	JPS_ASSERT(grid(p) && dx && dy && dz);
+	if (!(grid(p) && dx && dy && dz))
+	{
+		return InvalidPos;
+	}
+
+	const FPosition finpos = finishNode->pos;
+	unsigned steps = 0;
+
+	switch (dMove)
+	{
+		case DiagonalMovement::Always:
+			while (true)
+			{
+				if (p == finpos)
+				{
+					break;
+				}
+
+				++steps;
+
+				const unsigned x = p.x;
+				const unsigned y = p.y;
+				const unsigned z = p.z;
+
+				// forced
+				{
+					// 3D
+					{
+						if (grid(x - dx, y + dy, z + dz) && !grid(x - dx, y, z) ||
+							grid(x + dx, y - dy, z + dz) && !grid(x, y - dy, z) ||
+							grid(x + dx, y + dy, z - dz) && !grid(x, y, z - dz) ||
+							grid(x - dx, y - dy, z + dz) && !grid(x - dx, y - dy, z) && !grid(x - dx, y, z) && !grid(x, y - dy, z) ||
+							grid(x - dx, y + dy, z - dz) && !grid(x - dx, y, z - dz) && !grid(x - dx, y, z) && !grid(x, y, z - dz) ||
+							grid(x + dx, y - dy, z - dz) && !grid(x, y - dy, z - dz) && !grid(x, y - dy, z) && !grid(x, y, z - dz))
+						{
+							break;
+						}
+					}
+					// !3D
+					// 2D
+					{
+						if (grid(x - dx, y + dy, z) && !grid(x - dx, y, z) && !grid(x - dx, y, z - dz) ||
+							grid(x - dx, y, z + dz) && !grid(x - dx, y, z) && !grid(x - dx, y - dy, z) ||
+							grid(x + dx, y - dy, z) && !grid(x, y - dy, z) && !grid(x, y - dy, z - dz) ||
+							grid(x, y - dy, z + dz) && !grid(x, y - dy, z) && !grid(x - dx, y - dy, z) ||
+							grid(x + dx, y, z - dz) && !grid(x, y, z - dz) && !grid(x, y - dy, z - dz) ||
+							grid(x, y + dy, z - dz) && !grid(x, y, z - dz) && !grid(x - dx, y, z - dz))
+						{
+							break;
+						}
+					}
+					// !2D
+				}
+				// !forced
+
+				// recursion
+				{
+					if (grid(x + dx, y, z) && jumpX(NewPos(x + dx, y, z), dx).IsValid())
+					{
+						break;
+					}
+					if (grid(x, y + dy, z) && jumpY(NewPos(x, y + dy, z), dy).IsValid())
+					{
+						break;
+					}
+					if (grid(x, y, z + dz) && jumpZ(NewPos(x, y, z + dz), dz).IsValid())
+					{
+						break;
+					}
+
+					if (grid(x + dx, y + dy, z) && jumpXY(NewPos(x + dx, y + dy, z), dx, dy).IsValid())
+					{
+						break;
+					}
+					if (grid(x + dx, y, z + dz) && jumpXZ(NewPos(x + dx, y, z + dz), dx, dz).IsValid())
+					{
+						break;
+					}
+					if (grid(x, y + dy, z + dz) && jumpYZ(NewPos(x, y + dy, z + dz), dy, dz).IsValid())
+					{
+						break;
+					}
+				}
+				// !recursion
+
+				if (grid(x + dx, y + dy, z + dz))
+				{
+					p.x += dx;
+					p.y += dy;
+					p.z += dz;
+				}
+				else
+				{
+					p = InvalidPos;
+					break;
+				}
+			}
+			break;
+	}
+
+	stepsTotal += steps;
+
+	return p;
 }
 
 #pragma region 2D_Jumps
 
 inline FPosition Searcher::jumpXY(FPosition p, const int dx, const int dy)
 {
-	return FPosition();
+	JPS_ASSERT(grid(p) && dx && dy);
+	if (!(grid(p) && dx && dy))
+	{
+		return InvalidPos;
+	}
+
+	const FPosition finpos = finishNode->pos;
+	unsigned steps = 0;
+	const int skip = this->skip;
+
+	switch (dMove)
+	{
+		case DiagonalMovement::Always:
+			while (true)
+			{
+				if (p == finpos)
+				{
+					break;
+				}
+
+				++steps;
+
+				const unsigned x = p.x;
+				const unsigned y = p.y;
+				const unsigned z = p.z;
+
+				// forced
+				{
+					if (grid(x - dx, y + dy, z) && !grid(x - dx, y, z) ||
+						grid(x + dx, y - dy, z) && !grid(x, y - dy, z))
+					{
+						break;
+					}
+
+					bool tcheck = false;
+					for (int tdz = -skip; tdz < skip + 1; tdz += (skip << 1))
+					{
+						const int zz = z + tdz;
+						if (!grid(x, y, zz))
+						{
+							if (grid(x + dx, y, zz) ||
+								grid(x, y + dy, zz) ||
+								grid(x + dx, y + dy, zz) ||
+								grid(x + dx, y - dy, zz) && !grid(x, y - dy, zz) && !grid(x, y - dy, z) ||
+								grid(x - dx, y + dy, zz) && !grid(x - dx, y, zz) && !grid(x - dx, y, z))
+							{
+								tcheck = true;
+								break;
+							}
+						}
+					}
+					if (tcheck)
+					{
+						break;
+					}
+				}
+				// !forced
+
+				// recursion
+				{
+					if (grid(x + dx, y, z) && jumpX(NewPos(x + dx, y, z), dx).IsValid())
+					{
+						break;
+					}
+					if (grid(x, y + dy, z) && jumpY(NewPos(x, y + dy, z), dy).IsValid())
+					{
+						break;
+					}
+				}
+				// !recursion
+
+				if (grid(x + dx, y + dy, z))
+				{
+					p.x += dx;
+					p.y += dy;
+				}
+				else
+				{
+					p = InvalidPos;
+					break;
+				}
+			}
+			break;
+		case DiagonalMovement::AtLeastOnePassable:
+			break;
+		case DiagonalMovement::AllPassable:
+			break;
+		case DiagonalMovement::Never:
+			/*
+			while (true)
+			{
+			if (p == finpos)
+			{
+			break;
+			}
+
+			++steps;
+
+			const unsigned x = p.x;
+			const unsigned y = p.y;
+			const unsigned z = p.z;
+
+
+			}
+			*/
+			break;
+		default:
+			break;
+	}
+
+	stepsTotal += steps;
+
+	return p;
 }
 
 inline FPosition Searcher::jumpXZ(FPosition p, const int dx, const int dz)
 {
-	return FPosition();
+	JPS_ASSERT(grid(p) && dx && dz);
+	if (!(grid(p) && dx && dz))
+	{
+		return InvalidPos;
+	}
+
+	const FPosition finpos = finishNode->pos;
+	unsigned steps = 0;
+	const int skip = this->skip;
+
+	switch (dMove)
+	{
+		case DiagonalMovement::Always:
+			while (true)
+			{
+				if (p == finpos)
+				{
+					break;
+				}
+
+				++steps;
+
+				const unsigned x = p.x;
+				const unsigned y = p.y;
+				const unsigned z = p.z;
+
+				// forced
+				{
+					if (grid(x - dx, y, z + dz) && !grid(x - dx, y, z) ||
+						grid(x + dx, y, z - dz) && !grid(x, y, z - dz))
+					{
+						break;
+					}
+
+					bool tcheck = false;
+					// must explain all these 'for'-s later
+					//
+					// DO NOT FORGET
+					//
+					// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+					for (int tdy = -skip; tdy < skip + 1; tdy += (skip << 1))
+					{
+						const int yy = y + tdy;
+						if (!grid(x, yy, z))
+						{
+							if (grid(x + dx, yy, z) ||
+								grid(x, yy, z + dz) ||
+								grid(x + dx, yy, z + dz) ||
+								grid(x + dx, yy, z - dz) && !grid(x, yy, z - dz) && !grid(x, y, z - dz) ||
+								grid(x - dx, yy, z + dz) && !grid(x - dx, yy, z) && !grid(x - dx, y, z))
+							{
+								tcheck = true;
+								break;
+							}
+						}
+					}
+					if (tcheck)
+					{
+						break;
+					}
+				}
+				// !forced
+
+				// recursion
+				{
+					if (grid(x + dx, y, z) && jumpX(NewPos(x + dx, y, z), dx).IsValid())
+					{
+						break;
+					}
+					if (grid(x, y, z + dz) && jumpZ(NewPos(x, y, z + dz), dz).IsValid())
+					{
+						break;
+					}
+				}
+				// !recursion
+
+				if (grid(x + dx, y, z + dz))
+				{
+					p.x += dx;
+					p.z += dz;
+				}
+				else
+				{
+					p = InvalidPos;
+					break;
+				}
+			}
+			break;
+		case DiagonalMovement::AtLeastOnePassable:
+			break;
+		case DiagonalMovement::AllPassable:
+			break;
+		case DiagonalMovement::Never:
+			/*
+			while (true)
+			{
+				if (p == finpos)
+				{
+					break;
+				}
+
+				++steps;
+
+				const unsigned x = p.x;
+				const unsigned y = p.y;
+				const unsigned z = p.z;
+
+
+			}
+			*/
+			break;
+		default:
+			break;
+	}
+
+	stepsTotal += steps;
+
+	return p;
 }
 
 inline FPosition Searcher::jumpYZ(FPosition p, const int dy, const int dz)
 {
-	return FPosition();
+	JPS_ASSERT(grid(p) && dy && dz);
+	if (!(grid(p) && dy && dz))
+	{
+		return InvalidPos;
+	}
+
+	const FPosition finpos = finishNode->pos;
+	unsigned steps = 0;
+	const int skip = this->skip;
+
+	switch (dMove)
+	{
+		case DiagonalMovement::Always:
+			while (true)
+			{
+				if (p == finpos)
+				{
+					break;
+				}
+	
+				++steps;
+	
+				const unsigned x = p.x;
+				const unsigned y = p.y;
+				const unsigned z = p.z;
+	
+				// forced
+				{
+					if (grid(x, y - dy, z + dz) && !grid(x, y - dy, z) ||
+						grid(x, y + dy, z - dz) && !grid(x, y, z - dz))
+					{
+						break;
+					}
+
+					bool tcheck = false;
+					// must explain all these 'for'-s later
+					//
+					// DO NOT FORGET
+					//
+					// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+					for (int tdx = -skip; tdx < skip + 1; tdx += (skip << 1))
+					{
+						const int xx = x + tdx;
+						if (!grid(xx, y, z))
+						{
+							if (grid(xx, y + dy, z) ||
+								grid(xx, y, z + dz) ||
+								grid(xx, y + dy, z + dz) ||
+								grid(xx, y + dy, z - dz) && !grid(xx, y, z - dz) && !grid(x, y, z - dz) ||
+								grid(xx, y - dy, z + dz) && !grid(xx, y - dy, z) && !grid(x, y - dy, z))
+							{
+								tcheck = true;
+								break;
+							}
+						}
+					}
+					if (tcheck)
+					{
+						break;
+					}
+				}
+				// !forced
+
+				// recursion
+				{
+					if (grid(x, y + dy, z) && jumpY(NewPos(x, y + dy, z), dy).IsValid())
+					{
+						break;
+					}
+					if (grid(x, y, z + dz) && jumpZ(NewPos(x, y, z + dz), dz).IsValid())
+					{
+						break;
+					}
+				}
+				// !recursion
+
+				if (grid(x, y + dy, z + dz))
+				{
+					p.y += dy;
+					p.z += dz;
+				}
+				else
+				{
+					p = InvalidPos;
+					break;
+				}
+			}
+			break;
+		case DiagonalMovement::AtLeastOnePassable:
+			break;
+		case DiagonalMovement::AllPassable:
+			break;
+		case DiagonalMovement::Never:
+			/*
+			while (true)
+			{
+				if (p == finpos)
+				{
+					break;
+				}
+	
+				++steps;
+	
+				const unsigned x = p.x;
+				const unsigned y = p.y;
+				const unsigned z = p.z;
+	
+	
+			}
+			*/
+			break;
+		default:
+			break;
+	}
+
+	stepsTotal += steps;
+
+	return p;
 }
 
 #pragma endregion
@@ -229,17 +678,266 @@ inline FPosition Searcher::jumpYZ(FPosition p, const int dy, const int dz)
 
 inline FPosition Searcher::jumpX(FPosition p, const int dx)
 {
-	return FPosition();
+	JPS_ASSERT(grid(p) && dx);
+	if (!(grid(p) && dx))
+	{
+		return InvalidPos;
+	}
+
+	const FPosition finpos = finishNode->pos;
+	unsigned steps = 0;
+	const int skip = this->skip;
+
+	switch (dMove)
+	{
+	case DiagonalMovement::Always:
+		while (true)
+		{
+			if (p == finpos)
+			{
+				break;
+			}
+
+			++steps;
+
+			const unsigned x = p.x;
+			const unsigned y = p.y;
+			const unsigned z = p.z;
+
+			// forced
+			{
+				const int xx = x + dx;
+				if (grid(xx, y + skip, z) && !grid(x, y + skip, z) ||
+					grid(xx, y - skip, z) && !grid(x, y - skip, z) ||
+					grid(xx, y, z + skip) && !grid(x, y, z + skip) ||
+					grid(xx, y, z - skip) && !grid(x, y, z - skip) ||
+					grid(xx, y + skip, z + skip) && !grid(x, y + skip, z + skip) && !grid(x, y + skip, z) && !grid(x, y, z + skip) ||
+					grid(xx, y - skip, z + skip) && !grid(x, y - skip, z + skip) && !grid(x, y - skip, z) && !grid(x, y, z + skip) ||
+					grid(xx, y + skip, z - skip) && !grid(x, y + skip, z - skip) && !grid(x, y + skip, z) && !grid(x, y, z - skip) ||
+					grid(xx, y - skip, z - skip) && !grid(x, y - skip, z - skip) && !grid(x, y - skip, z) && !grid(x, y, z - skip))
+				{
+					break;
+				}
+			}
+			// !forced
+
+			if (grid(x + dx, y, z))
+			{
+				p.x += dx;
+			}
+			else
+			{
+				p = InvalidPos;
+				break;
+			}
+		}
+		break;
+	case DiagonalMovement::AtLeastOnePassable:
+		break;
+	case DiagonalMovement::AllPassable:
+		break;
+	case DiagonalMovement::Never:
+		/*
+		while (true)
+		{
+			if (p == finpos)
+			{
+				break;
+			}
+
+			++steps;
+
+			const unsigned x = p.x;
+			const unsigned y = p.y;
+			const unsigned z = p.z;
+
+
+		}
+		*/
+		break;
+	default:
+		break;
+	}
+
+	stepsTotal += steps;
+
+	return p;
 }
 
 inline FPosition Searcher::jumpY(FPosition p, const int dy)
 {
-	return FPosition();
+	JPS_ASSERT(grid(p) && dy);
+	if (!(grid(p) && dy))
+	{
+		return InvalidPos;
+	}
+
+	const FPosition finpos = finishNode->pos;
+	unsigned steps = 0;
+	const int skip = this->skip;
+
+	switch (dMove)
+	{
+	case DiagonalMovement::Always:
+		while (true)
+		{
+			if (p == finpos)
+			{
+				break;
+			}
+
+			++steps;
+
+			const unsigned x = p.x;
+			const unsigned y = p.y;
+			const unsigned z = p.z;
+
+			// forced
+			{
+				const int yy = y + dy;
+				if (grid(x + skip, yy, z) && !grid(x + skip, y, z) ||
+					grid(x - skip, yy, z) && !grid(x - skip, y, z) ||
+					grid(x, yy, z + skip) && !grid(x, y, z + skip) ||
+					grid(x, yy, z - skip) && !grid(x, y, z - skip) ||
+					grid(x + skip, yy, z + skip) && !grid(x + skip, y, z + skip) && !grid(x + skip, y, z) && !grid(x, y, z + skip) ||
+					grid(x - skip, yy, z + skip) && !grid(x - skip, y, z + skip) && !grid(x - skip, y, z) && !grid(x, y, z + skip) ||
+					grid(x + skip, yy, z - skip) && !grid(x + skip, y, z - skip) && !grid(x + skip, y, z) && !grid(x, y, z - skip) ||
+					grid(x - skip, yy, z - skip) && !grid(x - skip, y, z - skip) && !grid(x - skip, y, z) && !grid(x, y, z - skip))
+				{
+					break;
+				}
+			}
+			// !forced
+
+			if (grid(x, y + dy, z))
+			{
+				p.y += dy;
+			}
+			else
+			{
+				p = InvalidPos;
+				break;
+			}
+		}
+		break;
+	case DiagonalMovement::AtLeastOnePassable:
+		break;
+	case DiagonalMovement::AllPassable:
+		break;
+	case DiagonalMovement::Never:
+		/*
+		while (true)
+		{
+		if (p == finpos)
+		{
+		break;
+		}
+
+		++steps;
+
+		const unsigned x = p.x;
+		const unsigned y = p.y;
+		const unsigned z = p.z;
+
+
+		}
+		*/
+		break;
+	default:
+		break;
+	}
+
+	stepsTotal += steps;
+
+	return p;
 }
 
 inline FPosition Searcher::jumpZ(FPosition p, const int dz)
 {
-	return FPosition();
+	JPS_ASSERT(grid(p) && dz);
+	if (!(grid(p) && dz))
+	{
+		return InvalidPos;
+	}
+
+	const FPosition finpos = finishNode->pos;
+	unsigned steps = 0;
+	const int skip = this->skip;
+
+	switch (dMove)
+	{
+	case DiagonalMovement::Always:
+		while (true)
+		{
+			if (p == finpos)
+			{
+				break;
+			}
+
+			++steps;
+
+			const unsigned x = p.x;
+			const unsigned y = p.y;
+			const unsigned z = p.z;
+
+			// forced
+			{
+				const int zz = z + dz;
+				if (grid(x + skip, y, zz) && !grid(x + skip, y, z) ||
+					grid(x - skip, y, zz) && !grid(x - skip, y, z) ||
+					grid(x, y + skip, zz) && !grid(x, y + skip, z) ||
+					grid(x, y - skip, zz) && !grid(x, y - skip, z) ||
+					grid(x + skip, y + skip, zz) && !grid(x + skip, y + skip, z) && !grid(x + skip, y, z) && !grid(x, y + skip, z) ||
+					grid(x - skip, y + skip, zz) && !grid(x - skip, y + skip, z) && !grid(x - skip, y, z) && !grid(x, y + skip, z) ||
+					grid(x + skip, y - skip, zz) && !grid(x + skip, y - skip, z) && !grid(x + skip, y, z) && !grid(x, y - skip, z) ||
+					grid(x - skip, y - skip, zz) && !grid(x - skip, y - skip, z) && !grid(x - skip, y, z) && !grid(x, y - skip, z))
+				{
+					break;
+				}
+			}
+			// !forced
+
+			if (grid(x, y, z + dz))
+			{
+				p.z += dz;
+			}
+			else
+			{
+				p = InvalidPos;
+				break;
+			}
+		}
+		break;
+	case DiagonalMovement::AtLeastOnePassable:
+		break;
+	case DiagonalMovement::AllPassable:
+		break;
+	case DiagonalMovement::Never:
+		/*
+		while (true)
+		{
+		if (p == finpos)
+		{
+		break;
+		}
+
+		++steps;
+
+		const unsigned x = p.x;
+		const unsigned y = p.y;
+		const unsigned z = p.z;
+
+
+		}
+		*/
+		break;
+	default:
+		break;
+	}
+
+	stepsTotal += steps;
+
+	return p;
 }
 
 #pragma endregion
@@ -249,7 +947,7 @@ inline FPosition Searcher::jumpZ(FPosition p, const int dz)
 #pragma endregion
 
 #pragma region Main_Private_Methods_Definitions
-
+// ready
 inline void Searcher::IdentifySuccessors(const Node * n)
 {
 	FPosition buf[26];
@@ -291,7 +989,7 @@ inline void Searcher::IdentifySuccessors(const Node * n)
 		}
 	}
 }
-
+// partially ready
 inline unsigned Searcher::FindNeighbours(const Node * n, FPosition * Buf) const
 {
 	FPosition * p = Buf;
@@ -318,6 +1016,507 @@ inline unsigned Searcher::FindNeighbours(const Node * n, FPosition * Buf) const
 
 	if (n->parent)
 	{
+		int dx = x - n->parent->pos.x;
+		if (abs(dx) > 1)
+		{
+			dx = dx > 0 ? 1 : -1;
+		}
+		dx *= skip;
+
+		int dy = y - n->parent->pos.y;
+		if (abs(dy) > 1)
+		{
+			dy = dy > 0 ? 1 : -1;
+		}
+		dy *= skip;
+
+		int dz = z - n->parent->pos.z;
+		if (abs(dz) > 1)
+		{
+			dz = dz > 0 ? 1 : -1;
+		}
+		dz *= skip;
+
+		switch (dMove)
+		{
+			case DiagonalMovement::Always:
+				if (dx && dy && dz)
+				{
+					// 1D
+					{
+						addToBufCheck(x + dx, y, z, p);
+						addToBufCheck(x, y + dy, z, p);
+						addToBufCheck(x, y, z + dz, p);
+					}
+					// !1D
+
+					// 2D
+					{
+						// Oxy
+						{
+							addToBufCheck(x + dx, y + dy, z, p);
+							// forced
+							{
+								if (grid(x - dx, y + dy, z) &&
+									!grid(x - dx, y, z) && !grid(x - dx, y, z - dz))
+								{
+									addToBuf(x - dx, y + dy, z, p);
+								}
+								if (grid(x + dx, y - dy, z) &&
+									!grid(x, y - dy, z) && !grid(x, y - dy, z - dz))
+								{
+									addToBuf(x + dx, y - dy, z, p);
+								}
+							}
+							// !forced
+						}
+						// !Oxy
+
+						// Oxz
+						{
+							addToBufCheck(x + dx, y, z + dz, p);
+							// forced
+							{
+								if (grid(x - dx, y, z + dz) &&
+									!grid(x - dx, y, z) && !grid(x - dx, y - dy, z))
+								{
+									addToBuf(x - dx, y, z + dz, p);
+								}
+								if (grid(x + dx, y, z - dz) &&
+									!grid(x, y, z - dz) && !grid(x, y - dy, z - dz))
+								{
+									addToBuf(x + dx, y, z - dz, p);
+								}
+							}
+							// !forced
+						}
+						// !Oxz
+
+						// Oyz
+						{
+							addToBufCheck(x, y + dy, z + dz, p);
+							// forced
+							{
+								if (grid(x, y - dy, z + dz) &&
+									!grid(x, y - dy, z) && !grid(x - dx, y - dy, z))
+								{
+									addToBuf(x, y - dy, z + dz, p);
+								}
+								if (grid(x, y + dy, z - dz) &&
+									!grid(x, y, z - dz) && !grid(x - dx, y, z - dz))
+								{
+									addToBuf(x, y + dy, z - dz, p);
+								}
+							}
+							// !forced
+						}
+						// !Oyz
+					}
+					// !2D
+
+					// 3D
+					{
+						addToBufCheck(x + dx, y + dy, z + dz, p);
+						// forced
+						// one negative delta
+						if (grid(x + dx, y + dy, z - dz) && !grid(x, y, z - dz))
+						{
+							addToBuf(x + dx, y + dy, z - dz, p);
+						}
+						if (grid(x + dx, y - dy, z + dz) && !grid(x, y - dy, z))
+						{
+							addToBuf(x + dx, y - dy, z + dz, p);
+						}
+						if (grid(x - dx, y + dy, z + dz) && !grid(x - dx, y, z))
+						{
+							addToBuf(x - dx, y + dy, z + dz, p);
+						}
+						// !one negative delta
+
+						// two negative deltas
+						if (grid(x + dx, y - dy, z - dz) &&
+							!grid(x, y - dy, z - dz) && !grid(x, y - dy, z) && !grid(x, y, z - dz))
+						{
+							addToBuf(x + dx, y - dy, z - dz, p);
+						}
+						if (grid(x - dx, y + dy, z - dz) &&
+							!grid(x - dx, y, z - dz) && !grid(x - dx, y, z) && !grid(x, y, z - dz))
+						{
+							addToBuf(x - dx, y + dy, z - dz, p);
+						}
+						if (grid(x - dx, y - dy, z + dz) &&
+							!grid(x - dx, y - dy, z) && !grid(x - dx, y, z) && !grid(x, y - dy, z))
+						{
+							addToBuf(x - dx, y - dy, z + dz, p);
+						}
+						// !two negative deltas
+						// !forced
+					}
+					// !3D
+				}
+				else if (dx && dy)
+				{
+					// 1D
+					{
+						addToBufCheck(x + dx, y, z, p);
+						addToBufCheck(x, y + dy, z, p);
+					}
+					// !1D
+
+					// Diagonal
+					{
+						addToBufCheck(x + dx, y + dy, z, p);
+						// forced
+						{
+							if (grid(x - dx, y + dy, z) && !grid(x - dx, y, z))
+							{
+								addToBuf(x - dx, y + dy, z, p);
+							}
+							if (grid(x + dx, y - dy, z) && !grid(x, y - dy, z))
+							{
+								addToBuf(x + dx, y - dy, z, p);
+							}
+							// Oz
+							for (int tdz = -skip; tdz < skip + 1; tdz += (skip << 1))
+							{
+								if (!grid(x, y, z + tdz))
+								{
+									addToBufCheck(x, y + dy, z + tdz, p);
+									addToBufCheck(x + dx, y, z + tdz, p);
+									addToBufCheck(x + dx, y + dy, z + tdz, p);
+
+									if (grid(x - dx, y + dy, z + tdz) &&
+										!grid(x - dx, y, z + tdz) && !grid(x - dx, y, z))
+									{
+										addToBuf(x - dx, y + dy, z + tdz, p);
+									}
+									if (grid(x + dx, y - dy, z + tdz) &&
+										!grid(x, y - dy, z + tdz) && !grid(x, y - dy, z))
+									{
+										addToBuf(x + dx, y - dy, z + tdz, p);
+									}
+								}
+							}
+							// !Oz
+						}
+						// !forced
+					}
+					// !Diagonal
+
+				}
+				else if (dx && dz)
+				{
+					// 1D
+					{
+						addToBufCheck(x + dx, y, z, p);
+						addToBufCheck(x, y, z + dz, p);
+					}
+					// !1D
+
+					// Diagonal
+					{
+						addToBufCheck(x + dx, y, z + dz, p);
+						// forced
+						{
+							if (grid(x - dx, y, z + dz) && !grid(x - dx, y, z))
+							{
+								addToBuf(x - dx, y, z + dz, p);
+							}
+							if (grid(x + dx, y, z - dz) && !grid(x, y, z - dz))
+							{
+								addToBuf(x + dx, y, z - dz, p);
+							}
+							// Oy
+							for (int tdy = -skip; tdy < skip + 1; tdy += (skip << 1))
+							{
+								if (!grid(x, y + tdy, z))
+								{
+									addToBufCheck(x + dx, y + tdy, z, p);
+									addToBufCheck(x, y + tdy, z + dz, p);
+									addToBufCheck(x + dx, y + tdy, z + dz, p);
+
+									if (grid(x - dx, y + tdy, z + dz) &&
+										!grid(x - dx, y + tdy, z) && !grid(x - dx, y, z))
+									{
+										addToBuf(x - dx, y + tdy, z + dz, p);
+									}
+									if (grid(x + dx, y + tdy, z - dz) &&
+										!grid(x, y + tdy, z - dz) && !grid(x, y, z - dz))
+									{
+										addToBuf(x + dx, y + tdy, z - dz, p);
+									}
+								}
+							}
+							// !Oy
+						}
+						// !forced
+					}
+					// !Diagonal
+				}
+				else if (dy && dz)
+				{
+					// 1D
+					{
+						addToBufCheck(x, y + dy, z, p);
+						addToBufCheck(x, y, z + dz, p);
+					}
+					// !1D
+
+					// Diagonal
+					{
+						addToBufCheck(x, y + dy, z + dz, p);
+						// forced
+						{
+							if (grid(x, y - dy, z + dz) && !grid(x, y - dy, z))
+							{
+								addToBuf(x, y - dy, z + dz, p);
+							}
+							if (grid(x, y + dy, z - dz) && !grid(x, y, z - dz))
+							{
+								addToBuf(x, y + dy, z - dz, p);
+							}
+							// Ox
+							for (int tdx = -skip; tdx < skip + 1; tdx += (skip << 1))
+							{
+								if (!grid(x + tdx, y, z))
+								{
+									addToBufCheck(x + tdx, y + dy, z, p);
+									addToBufCheck(x + tdx, y, z + dz, p);
+									addToBufCheck(x + tdx, y + dy, z + dz, p);
+
+									if (grid(x + tdx, y - dy, z + dz) &&
+										!grid(x + tdx, y - dy, z) && !grid(x, y - dy, z))
+									{
+										addToBuf(x + tdx, y - dy, z + dz, p);
+									}
+									if (grid(x + tdx, y + dy, z - dz) &&
+										!grid(x + tdx, y, z - dz) && !grid(x, y, z - dz))
+									{
+										addToBuf(x + tdx, y + dy, z - dz, p);
+									}
+								}
+							}
+							// !Ox
+						}
+						// !forced
+					}
+					// !Diagonal
+				}
+				else if (dx)
+				{
+					addToBufCheck(x + dx, y, z, p);
+					if (grid(x + dx, y + skip, z) && !grid(x, y + skip, z))
+					{
+						addToBuf(x + dx, y + skip, z, p);
+					}
+					if (grid(x + dx, y - skip, z) && !grid(x, y - skip, z))
+					{
+						addToBuf(x + dx, y - skip, z, p);
+					}
+
+					for (int tdz = -skip; tdz < skip + 1; tdz += (skip << 1))
+					{
+						if (!grid(x, y, z + tdz))
+						{
+							addToBufCheck(x + dx, y, z + tdz, p);
+
+							if (grid(x + dx, y + skip, z + tdz) && !grid(x, y + skip, z + tdz))
+							{
+								addToBuf(x + dx, y + skip, z + tdz, p);
+							}
+							if (grid(x + dx, y - skip, z + tdz) && !grid(x, y - skip, z + tdz))
+							{
+								addToBuf(x + dx, y - skip, z + tdz, p);
+							}
+						}
+					}
+				}
+				else if (dy)
+				{
+					addToBufCheck(x, y + dy, z, p);
+					if (grid(x + skip, y + dy, z) && !grid(x + skip, y, z))
+					{
+						addToBuf(x + skip, y + dy, z, p);
+					}
+					if (grid(x - skip, y + dy, z) && !grid(x - skip, y, z))
+					{
+						addToBuf(x - skip, y + dy, z, p);
+					}
+
+					for (int tdz = -skip; tdz < skip + 1; tdz += (skip << 1))
+					{
+						if (!grid(x, y, z + tdz))
+						{
+							addToBufCheck(x, y + dy, z + tdz, p);
+
+							if (grid(x + skip, y + dy, z + tdz) && !grid(x + skip, y, z + tdz))
+							{
+								addToBuf(x + skip, y + dy, z + tdz, p);
+							}
+							if (grid(x - skip, y + dy, z + tdz) && !grid(x - skip, y, z + tdz))
+							{
+								addToBuf(x - skip, y + dy, z + tdz, p);
+							}
+						}
+					}
+				}
+				else if (dz)
+				{
+					addToBufCheck(x, y, z + dz, p);
+					if (grid(x + skip, y, z + dz) && !grid(x + skip, y, z))
+					{
+						addToBuf(x + skip, y, z + dz, p);
+					}
+					if (grid(x - skip, y, z + dz) && !grid(x - skip, y, z))
+					{
+						addToBuf(x + skip, y, z + dz, p);
+					}
+
+					for (int tdy = -skip; tdy < skip + 1; tdy += (skip << 1))
+					{
+						if (!grid(x, y + tdy, z))
+						{
+							addToBufCheck(x, y + tdy, z + dz, p);
+
+							if (grid(x + skip, y + tdy, z + dz) && !grid(x + skip, y + tdy, z))
+							{
+								addToBuf(x + skip, y + tdy, z + dz, p);
+							}
+							if (grid(x - skip, y + tdy, z + dz) && !grid(x - skip, y + tdy, z))
+							{
+								addToBuf(x - skip, y + tdy, z + dz, p);
+							}
+						}
+					}
+				}
+				break;
+			case DiagonalMovement::AtLeastOnePassable:
+				if (dx && dy && dz)
+				{
+					// 1D
+					b[2][1][1] = grid(x + dx, y, z);
+					if (b[2][1][1])
+					{
+						addToBuf(x + dx, y, z, p);
+					}
+					b[1][2][1] = grid(x, y + dy, z);
+					if (b[1][2][1])
+					{
+						addToBuf(x, y + dy, z, p);
+					}
+					b[1][1][2] = grid(x, y, z + dz);
+					if (b[1][1][2])
+					{
+						addToBuf(x, y, z + dz, p);
+					}
+					// !1D
+
+					// 2D
+					// Oxy
+					b[2][2][1] = grid(x + dx, y + dy, z) && (b[2][1][1] || b[1][2][1]);
+					if (b[2][2][1])
+					{
+						addToBuf(x + dx, y + dy, z, p);
+					}					
+					// forced
+					b[0][1][1] = grid(x - dx, y, z);
+					b[0][2][1] = grid(x - dx, y + dy, z) && (b[1][2][1] || b[0][1][1]);
+					b[0][1][0] = grid(x - dx, y, z - dz);
+					if (b[0][2][1] && !b[0][1][1] && !b[0][1][0])
+					{
+						addToBuf(x - dx, y + dy, z, p);
+					}
+					b[1][0][1] = grid(x, y - dy, z);
+					b[2][0][1] = grid(x + dx, y - dy, z) && (b[2][1][1] || b[1][0][1]);
+					b[1][0][0] = grid(x, y - dy, z - dz);
+					if (b[2][0][1] && !b[1][0][1] && !b[1][0][0])
+					{
+						addToBuf(x + dx, y - dy, z, p);
+					}
+					// !forced
+					// !Oxy
+
+					// Oxz
+					b[2][1][2] = grid(x + dx, y, z + dz) && (b[2][1][1] || b[1][1][2]);
+					if (b[2][1][2])
+					{
+						addToBufCheck(x + dx, y, z + dz, p);
+					}
+					// forced
+					b[0][1][2] = grid(x - dx, y, z + dz);
+					b[0][1][1] = grid(x - dx, y, z);
+					b[0][0][1] = grid(x - dx, y - dy, z);
+					if (grid(x - dx, y, z + dz) &&
+						!grid(x - dx, y, z) && !grid(x - dx, y - dy, z))
+					{
+						addToBuf(x - dx, y, z + dz, p);
+					}
+					if (grid(x + dx, y, z - dz) &&
+						!grid(x, y, z - dz) && !grid(x, y - dy, z - dz))
+					{
+						addToBuf(x + dx, y, z - dz, p);
+					}
+					// !forced
+					// !Oxz
+
+					// Oyz
+					addToBufCheck(x, y + dy, z + dz, p);
+					// forced
+					if (grid(x, y - dy, z + dz) &&
+						!grid(x, y - dy, z) && !grid(x - dx, y - dy, z))
+					{
+						addToBuf(x, y - dy, z + dz, p);
+					}
+					if (grid(x, y + dy, z - dz) &&
+						!grid(x, y, z - dz) && !grid(x - dx, y, z - dz))
+					{
+						addToBuf(x, y + dy, z - dz, p);
+					}
+					// !forced
+					// !Oyz
+					// !2D
+
+					// 3D
+					addToBufCheck(x + dx, y + dy, z + dz, p);
+					// forced
+					// one negative delta
+					if (grid(x + dx, y + dy, z - dz) && !grid(x, y, z - dz))
+					{
+						addToBuf(x + dx, y + dy, z - dz, p);
+					}
+					if (grid(x + dx, y - dy, z + dz) && !grid(x, y - dy, z))
+					{
+						addToBuf(x + dx, y - dy, z + dz, p);
+					}
+					if (grid(x - dx, y + dy, z + dz) && !grid(x - dx, y, z))
+					{
+						addToBuf(x - dx, y + dy, z + dz, p);
+					}
+					// !one negative delta
+
+					// two negative deltas
+					if (grid(x + dx, y - dy, z - dz) &&
+						!grid(x, y - dy, z - dz) && !grid(x, y - dy, z) && !grid(x, y, z - dz))
+					{
+						addToBuf(x + dx, y - dy, z - dz, p);
+					}
+					if (grid(x - dx, y + dy, z - dz) &&
+						!grid(x - dx, y, z - dz) && !grid(x - dx, y, z) && !grid(x, y, z - dz))
+					{
+						addToBuf(x - dx, y + dy, z - dz, p);
+					}
+					if (grid(x - dx, y - dy, z + dz) &&
+						!grid(x - dx, y - dy, z) && !grid(x - dx, y, z) && !grid(x, y - dy, z))
+					{
+						addToBuf(x - dx, y - dy, z + dz, p);
+					}
+					// !two negative deltas
+					// !forced
+					// !3D
+				}
+				break;
+		}
+
 
 		return unsigned(p - Buf);
 	}
@@ -479,7 +1678,7 @@ inline unsigned Searcher::FindNeighbours(const Node * n, FPosition * Buf) const
 
 #pragma endregion
 
-#pragma region No_parent_3D_Oyz
+#pragma region No_parent_2D_Oyz
 
 	switch (dMove)
 	{
@@ -614,11 +1813,11 @@ inline unsigned Searcher::FindNeighbours(const Node * n, FPosition * Buf) const
 
 	return unsigned(p - Buf);
 }
-
+// ready
 inline FPosition Searcher::Jump(const FPosition & Cur, const FPosition & Src)
 {
 	JPS_ASSERT(grid(Cur));
-	if (!grid(Cur.x, Cur.y, Cur.z))
+	if (!grid(Cur))
 	{
 		return InvalidPos;
 	}
@@ -633,7 +1832,7 @@ inline FPosition Searcher::Jump(const FPosition & Cur, const FPosition & Src)
 	int dz = Cur.z - Src.z;
 
 	JPS_ASSERT(dx || dy || dz);
-	if (!dx && !dy && !dz)
+	if (!(dx || dy || dz))
 	{
 		return InvalidPos;
 	}
@@ -670,7 +1869,7 @@ inline FPosition Searcher::Jump(const FPosition & Cur, const FPosition & Src)
 	JPS_ASSERT(false);
 	return FPosition();
 }
-
+// ready
 inline PositionVector Searcher::BacktracePath(const Node * tail) const
 {
 	JPS_ASSERT(tail == finishNode);

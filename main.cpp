@@ -4,10 +4,16 @@
 
 int main()
 {
-	unsigned x = 10;
-	unsigned y = 20;
-	int z = x - y;
-	std::cout << z << '\n';
+	while (true)
+	{
+		{
+			if (true)
+			{
+				break;
+			}
+		}
+	}
+	std::cout << "kek\n";
 
 	return 0;
 }
