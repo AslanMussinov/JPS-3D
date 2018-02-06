@@ -11,6 +11,8 @@
 #include "Grid.h"
 #include "Openlist.h"
 
+namespace JPS {
+
 inline static FPosition NewPos(unsigned x, unsigned y, unsigned z)
 {
 	return FPosition(x, y, z);
@@ -53,13 +55,25 @@ class Searcher
 
 public:
 
-	Searcher(FGrid& g, DiagonalMovement d = DiagonalMovement::Always) : grid(g), dMove(d), finishNode(NULL), skip(1U), stepsTotal(0U) {}
+	Searcher(FGrid& g) : grid(g) {}
+
+	Searcher(FGrid& g, DiagonalMovement d) : grid(g), dMove(d) {}
 
 	void FreeMemory()
 	{
 		openlist.Clear();
 		GridMap().swap(gridmap);
 		stepsTotal = 0U;
+	}
+
+	inline void SetGrid(FGrid & g)
+	{
+		grid = g;
+	}
+
+	inline void SetDiagonalMovement(DiagonalMovement d)
+	{
+		dMove = d;
 	}
 
 	inline void SetSkip(unsigned s)
@@ -78,20 +92,19 @@ public:
 private:
 
 	FGrid& grid;
-	DiagonalMovement dMove;
+	DiagonalMovement dMove = DiagonalMovement::Always;
 	Openlist openlist;
 	GridMap gridmap;
-	Node * startNode;
-	Node * finishNode;
-	unsigned skip;
-	unsigned stepsTotal;
+	Node * startNode = NULL;
+	Node * finishNode = NULL;
+	unsigned skip = 1U;
+	unsigned stepsTotal = 0U;
 
 #pragma region Auxiliary_Private_Methods_Declarations
 
 	Node * getNode(const FPosition & p);
 	void addToBuf(const unsigned x, const unsigned y, const unsigned z, FPosition *& buf) const;
 	void addToBufCheck(const int x, const int y, const int z, FPosition *& buf) const;
-	bool checkD(const int x, const int y, const int z, const int dx, const int dy, const int dz) const;
 
 	FPosition jumpXYZ(FPosition p, const int dx, const int dy, const int dz);
 	FPosition jumpXY(FPosition p, const int dx, const int dy);
@@ -192,11 +205,6 @@ inline void Searcher::addToBufCheck(const int x, const int y, const int z, FPosi
 	{
 		addToBuf(x, y, z, buf);
 	}
-}
-
-inline bool Searcher::checkD(const int x, const int y, const int z, const int dx, const int dy, const int dz) const
-{
-	return grid(x + dx, y + dy, z + dz);
 }
 
 #pragma region Jumps
@@ -321,7 +329,7 @@ inline FPosition Searcher::jumpXY(FPosition p, const int dx, const int dy)
 
 	const FPosition finpos = finishNode->pos;
 	unsigned steps = 0;
-	const int skip = this->skip;
+	const int cskip = this->skip;
 
 	switch (dMove)
 	{
@@ -348,7 +356,7 @@ inline FPosition Searcher::jumpXY(FPosition p, const int dx, const int dy)
 					}
 
 					bool tcheck = false;
-					for (int tdz = -skip; tdz < skip + 1; tdz += (skip << 1))
+					for (int tdz = -cskip; tdz < cskip + 1; tdz += (cskip << 1))
 					{
 						const int zz = z + tdz;
 						if (!grid(x, y, zz))
@@ -438,7 +446,7 @@ inline FPosition Searcher::jumpXZ(FPosition p, const int dx, const int dz)
 
 	const FPosition finpos = finishNode->pos;
 	unsigned steps = 0;
-	const int skip = this->skip;
+	const int cskip = this->skip;
 
 	switch (dMove)
 	{
@@ -470,7 +478,7 @@ inline FPosition Searcher::jumpXZ(FPosition p, const int dx, const int dz)
 					// DO NOT FORGET
 					//
 					// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-					for (int tdy = -skip; tdy < skip + 1; tdy += (skip << 1))
+					for (int tdy = -cskip; tdy < cskip + 1; tdy += (cskip << 1))
 					{
 						const int yy = y + tdy;
 						if (!grid(x, yy, z))
@@ -560,7 +568,7 @@ inline FPosition Searcher::jumpYZ(FPosition p, const int dy, const int dz)
 
 	const FPosition finpos = finishNode->pos;
 	unsigned steps = 0;
-	const int skip = this->skip;
+	const int cskip = this->skip;
 
 	switch (dMove)
 	{
@@ -592,7 +600,7 @@ inline FPosition Searcher::jumpYZ(FPosition p, const int dy, const int dz)
 					// DO NOT FORGET
 					//
 					// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-					for (int tdx = -skip; tdx < skip + 1; tdx += (skip << 1))
+					for (int tdx = -cskip; tdx < cskip + 1; tdx += (cskip << 1))
 					{
 						const int xx = x + tdx;
 						if (!grid(xx, y, z))
@@ -686,7 +694,7 @@ inline FPosition Searcher::jumpX(FPosition p, const int dx)
 
 	const FPosition finpos = finishNode->pos;
 	unsigned steps = 0;
-	const int skip = this->skip;
+	const int cskip = this->skip;
 
 	switch (dMove)
 	{
@@ -707,14 +715,14 @@ inline FPosition Searcher::jumpX(FPosition p, const int dx)
 			// forced
 			{
 				const int xx = x + dx;
-				if (grid(xx, y + skip, z) && !grid(x, y + skip, z) ||
-					grid(xx, y - skip, z) && !grid(x, y - skip, z) ||
-					grid(xx, y, z + skip) && !grid(x, y, z + skip) ||
-					grid(xx, y, z - skip) && !grid(x, y, z - skip) ||
-					grid(xx, y + skip, z + skip) && !grid(x, y + skip, z + skip) && !grid(x, y + skip, z) && !grid(x, y, z + skip) ||
-					grid(xx, y - skip, z + skip) && !grid(x, y - skip, z + skip) && !grid(x, y - skip, z) && !grid(x, y, z + skip) ||
-					grid(xx, y + skip, z - skip) && !grid(x, y + skip, z - skip) && !grid(x, y + skip, z) && !grid(x, y, z - skip) ||
-					grid(xx, y - skip, z - skip) && !grid(x, y - skip, z - skip) && !grid(x, y - skip, z) && !grid(x, y, z - skip))
+				if (grid(xx, y + cskip, z) && !grid(x, y + cskip, z) ||
+					grid(xx, y - cskip, z) && !grid(x, y - cskip, z) ||
+					grid(xx, y, z + cskip) && !grid(x, y, z + cskip) ||
+					grid(xx, y, z - cskip) && !grid(x, y, z - cskip) ||
+					grid(xx, y + cskip, z + cskip) && !grid(x, y + cskip, z + cskip) && !grid(x, y + cskip, z) && !grid(x, y, z + cskip) ||
+					grid(xx, y - cskip, z + cskip) && !grid(x, y - cskip, z + cskip) && !grid(x, y - cskip, z) && !grid(x, y, z + cskip) ||
+					grid(xx, y + cskip, z - cskip) && !grid(x, y + cskip, z - cskip) && !grid(x, y + cskip, z) && !grid(x, y, z - cskip) ||
+					grid(xx, y - cskip, z - cskip) && !grid(x, y - cskip, z - cskip) && !grid(x, y - cskip, z) && !grid(x, y, z - cskip))
 				{
 					break;
 				}
@@ -774,7 +782,7 @@ inline FPosition Searcher::jumpY(FPosition p, const int dy)
 
 	const FPosition finpos = finishNode->pos;
 	unsigned steps = 0;
-	const int skip = this->skip;
+	const int cskip = this->skip;
 
 	switch (dMove)
 	{
@@ -795,14 +803,14 @@ inline FPosition Searcher::jumpY(FPosition p, const int dy)
 			// forced
 			{
 				const int yy = y + dy;
-				if (grid(x + skip, yy, z) && !grid(x + skip, y, z) ||
-					grid(x - skip, yy, z) && !grid(x - skip, y, z) ||
-					grid(x, yy, z + skip) && !grid(x, y, z + skip) ||
-					grid(x, yy, z - skip) && !grid(x, y, z - skip) ||
-					grid(x + skip, yy, z + skip) && !grid(x + skip, y, z + skip) && !grid(x + skip, y, z) && !grid(x, y, z + skip) ||
-					grid(x - skip, yy, z + skip) && !grid(x - skip, y, z + skip) && !grid(x - skip, y, z) && !grid(x, y, z + skip) ||
-					grid(x + skip, yy, z - skip) && !grid(x + skip, y, z - skip) && !grid(x + skip, y, z) && !grid(x, y, z - skip) ||
-					grid(x - skip, yy, z - skip) && !grid(x - skip, y, z - skip) && !grid(x - skip, y, z) && !grid(x, y, z - skip))
+				if (grid(x + cskip, yy, z) && !grid(x + cskip, y, z) ||
+					grid(x - cskip, yy, z) && !grid(x - cskip, y, z) ||
+					grid(x, yy, z + cskip) && !grid(x, y, z + cskip) ||
+					grid(x, yy, z - cskip) && !grid(x, y, z - cskip) ||
+					grid(x + cskip, yy, z + cskip) && !grid(x + cskip, y, z + cskip) && !grid(x + cskip, y, z) && !grid(x, y, z + cskip) ||
+					grid(x - cskip, yy, z + cskip) && !grid(x - cskip, y, z + cskip) && !grid(x - cskip, y, z) && !grid(x, y, z + cskip) ||
+					grid(x + cskip, yy, z - cskip) && !grid(x + cskip, y, z - cskip) && !grid(x + cskip, y, z) && !grid(x, y, z - cskip) ||
+					grid(x - cskip, yy, z - cskip) && !grid(x - cskip, y, z - cskip) && !grid(x - cskip, y, z) && !grid(x, y, z - cskip))
 				{
 					break;
 				}
@@ -862,7 +870,7 @@ inline FPosition Searcher::jumpZ(FPosition p, const int dz)
 
 	const FPosition finpos = finishNode->pos;
 	unsigned steps = 0;
-	const int skip = this->skip;
+	const int cskip = this->skip;
 
 	switch (dMove)
 	{
@@ -883,14 +891,14 @@ inline FPosition Searcher::jumpZ(FPosition p, const int dz)
 			// forced
 			{
 				const int zz = z + dz;
-				if (grid(x + skip, y, zz) && !grid(x + skip, y, z) ||
-					grid(x - skip, y, zz) && !grid(x - skip, y, z) ||
-					grid(x, y + skip, zz) && !grid(x, y + skip, z) ||
-					grid(x, y - skip, zz) && !grid(x, y - skip, z) ||
-					grid(x + skip, y + skip, zz) && !grid(x + skip, y + skip, z) && !grid(x + skip, y, z) && !grid(x, y + skip, z) ||
-					grid(x - skip, y + skip, zz) && !grid(x - skip, y + skip, z) && !grid(x - skip, y, z) && !grid(x, y + skip, z) ||
-					grid(x + skip, y - skip, zz) && !grid(x + skip, y - skip, z) && !grid(x + skip, y, z) && !grid(x, y - skip, z) ||
-					grid(x - skip, y - skip, zz) && !grid(x - skip, y - skip, z) && !grid(x - skip, y, z) && !grid(x, y - skip, z))
+				if (grid(x + cskip, y, zz) && !grid(x + cskip, y, z) ||
+					grid(x - cskip, y, zz) && !grid(x - cskip, y, z) ||
+					grid(x, y + cskip, zz) && !grid(x, y + cskip, z) ||
+					grid(x, y - cskip, zz) && !grid(x, y - cskip, z) ||
+					grid(x + cskip, y + cskip, zz) && !grid(x + cskip, y + cskip, z) && !grid(x + cskip, y, z) && !grid(x, y + cskip, z) ||
+					grid(x - cskip, y + cskip, zz) && !grid(x - cskip, y + cskip, z) && !grid(x - cskip, y, z) && !grid(x, y + cskip, z) ||
+					grid(x + cskip, y - cskip, zz) && !grid(x + cskip, y - cskip, z) && !grid(x + cskip, y, z) && !grid(x, y - cskip, z) ||
+					grid(x - cskip, y - cskip, zz) && !grid(x - cskip, y - cskip, z) && !grid(x - cskip, y, z) && !grid(x, y - cskip, z))
 				{
 					break;
 				}
@@ -998,7 +1006,7 @@ inline unsigned Searcher::FindNeighbours(const Node * n, FPosition * Buf) const
 	const unsigned z = n->pos.z;
 	//lock skip;
 	const unsigned uskip = this->skip;
-	const int skip = this->skip;
+	const int cskip = this->skip;
 	//
 	bool b[3][3][3];
 
@@ -1021,21 +1029,21 @@ inline unsigned Searcher::FindNeighbours(const Node * n, FPosition * Buf) const
 		{
 			dx = dx > 0 ? 1 : -1;
 		}
-		dx *= skip;
+		dx *= cskip;
 
 		int dy = y - n->parent->pos.y;
 		if (abs(dy) > 1)
 		{
 			dy = dy > 0 ? 1 : -1;
 		}
-		dy *= skip;
+		dy *= cskip;
 
 		int dz = z - n->parent->pos.z;
 		if (abs(dz) > 1)
 		{
 			dz = dz > 0 ? 1 : -1;
 		}
-		dz *= skip;
+		dz *= cskip;
 
 		switch (dMove)
 		{
@@ -1177,7 +1185,7 @@ inline unsigned Searcher::FindNeighbours(const Node * n, FPosition * Buf) const
 								addToBuf(x + dx, y - dy, z, p);
 							}
 							// Oz
-							for (int tdz = -skip; tdz < skip + 1; tdz += (skip << 1))
+							for (int tdz = -cskip; tdz < cskip + 1; tdz += (cskip << 1))
 							{
 								if (!grid(x, y, z + tdz))
 								{
@@ -1227,7 +1235,7 @@ inline unsigned Searcher::FindNeighbours(const Node * n, FPosition * Buf) const
 								addToBuf(x + dx, y, z - dz, p);
 							}
 							// Oy
-							for (int tdy = -skip; tdy < skip + 1; tdy += (skip << 1))
+							for (int tdy = -cskip; tdy < cskip + 1; tdy += (cskip << 1))
 							{
 								if (!grid(x, y + tdy, z))
 								{
@@ -1276,7 +1284,7 @@ inline unsigned Searcher::FindNeighbours(const Node * n, FPosition * Buf) const
 								addToBuf(x, y + dy, z - dz, p);
 							}
 							// Ox
-							for (int tdx = -skip; tdx < skip + 1; tdx += (skip << 1))
+							for (int tdx = -cskip; tdx < cskip + 1; tdx += (cskip << 1))
 							{
 								if (!grid(x + tdx, y, z))
 								{
@@ -1305,28 +1313,28 @@ inline unsigned Searcher::FindNeighbours(const Node * n, FPosition * Buf) const
 				else if (dx)
 				{
 					addToBufCheck(x + dx, y, z, p);
-					if (grid(x + dx, y + skip, z) && !grid(x, y + skip, z))
+					if (grid(x + dx, y + cskip, z) && !grid(x, y + cskip, z))
 					{
-						addToBuf(x + dx, y + skip, z, p);
+						addToBuf(x + dx, y + cskip, z, p);
 					}
-					if (grid(x + dx, y - skip, z) && !grid(x, y - skip, z))
+					if (grid(x + dx, y - cskip, z) && !grid(x, y - cskip, z))
 					{
-						addToBuf(x + dx, y - skip, z, p);
+						addToBuf(x + dx, y - cskip, z, p);
 					}
 
-					for (int tdz = -skip; tdz < skip + 1; tdz += (skip << 1))
+					for (int tdz = -cskip; tdz < cskip + 1; tdz += (cskip << 1))
 					{
 						if (!grid(x, y, z + tdz))
 						{
 							addToBufCheck(x + dx, y, z + tdz, p);
 
-							if (grid(x + dx, y + skip, z + tdz) && !grid(x, y + skip, z + tdz))
+							if (grid(x + dx, y + cskip, z + tdz) && !grid(x, y + cskip, z + tdz))
 							{
-								addToBuf(x + dx, y + skip, z + tdz, p);
+								addToBuf(x + dx, y + cskip, z + tdz, p);
 							}
-							if (grid(x + dx, y - skip, z + tdz) && !grid(x, y - skip, z + tdz))
+							if (grid(x + dx, y - cskip, z + tdz) && !grid(x, y - cskip, z + tdz))
 							{
-								addToBuf(x + dx, y - skip, z + tdz, p);
+								addToBuf(x + dx, y - cskip, z + tdz, p);
 							}
 						}
 					}
@@ -1334,28 +1342,28 @@ inline unsigned Searcher::FindNeighbours(const Node * n, FPosition * Buf) const
 				else if (dy)
 				{
 					addToBufCheck(x, y + dy, z, p);
-					if (grid(x + skip, y + dy, z) && !grid(x + skip, y, z))
+					if (grid(x + cskip, y + dy, z) && !grid(x + cskip, y, z))
 					{
-						addToBuf(x + skip, y + dy, z, p);
+						addToBuf(x + cskip, y + dy, z, p);
 					}
-					if (grid(x - skip, y + dy, z) && !grid(x - skip, y, z))
+					if (grid(x - cskip, y + dy, z) && !grid(x - cskip, y, z))
 					{
-						addToBuf(x - skip, y + dy, z, p);
+						addToBuf(x - cskip, y + dy, z, p);
 					}
 
-					for (int tdz = -skip; tdz < skip + 1; tdz += (skip << 1))
+					for (int tdz = -cskip; tdz < cskip + 1; tdz += (cskip << 1))
 					{
 						if (!grid(x, y, z + tdz))
 						{
 							addToBufCheck(x, y + dy, z + tdz, p);
 
-							if (grid(x + skip, y + dy, z + tdz) && !grid(x + skip, y, z + tdz))
+							if (grid(x + cskip, y + dy, z + tdz) && !grid(x + cskip, y, z + tdz))
 							{
-								addToBuf(x + skip, y + dy, z + tdz, p);
+								addToBuf(x + cskip, y + dy, z + tdz, p);
 							}
-							if (grid(x - skip, y + dy, z + tdz) && !grid(x - skip, y, z + tdz))
+							if (grid(x - cskip, y + dy, z + tdz) && !grid(x - cskip, y, z + tdz))
 							{
-								addToBuf(x - skip, y + dy, z + tdz, p);
+								addToBuf(x - cskip, y + dy, z + tdz, p);
 							}
 						}
 					}
@@ -1363,28 +1371,28 @@ inline unsigned Searcher::FindNeighbours(const Node * n, FPosition * Buf) const
 				else if (dz)
 				{
 					addToBufCheck(x, y, z + dz, p);
-					if (grid(x + skip, y, z + dz) && !grid(x + skip, y, z))
+					if (grid(x + cskip, y, z + dz) && !grid(x + cskip, y, z))
 					{
-						addToBuf(x + skip, y, z + dz, p);
+						addToBuf(x + cskip, y, z + dz, p);
 					}
-					if (grid(x - skip, y, z + dz) && !grid(x - skip, y, z))
+					if (grid(x - cskip, y, z + dz) && !grid(x - cskip, y, z))
 					{
-						addToBuf(x + skip, y, z + dz, p);
+						addToBuf(x + cskip, y, z + dz, p);
 					}
 
-					for (int tdy = -skip; tdy < skip + 1; tdy += (skip << 1))
+					for (int tdy = -cskip; tdy < cskip + 1; tdy += (cskip << 1))
 					{
 						if (!grid(x, y + tdy, z))
 						{
 							addToBufCheck(x, y + tdy, z + dz, p);
 
-							if (grid(x + skip, y + tdy, z + dz) && !grid(x + skip, y + tdy, z))
+							if (grid(x + cskip, y + tdy, z + dz) && !grid(x + cskip, y + tdy, z))
 							{
-								addToBuf(x + skip, y + tdy, z + dz, p);
+								addToBuf(x + cskip, y + tdy, z + dz, p);
 							}
-							if (grid(x - skip, y + tdy, z + dz) && !grid(x - skip, y + tdy, z))
+							if (grid(x - cskip, y + tdy, z + dz) && !grid(x - cskip, y + tdy, z))
 							{
-								addToBuf(x - skip, y + tdy, z + dz, p);
+								addToBuf(x - cskip, y + tdy, z + dz, p);
 							}
 						}
 					}
@@ -1605,8 +1613,8 @@ inline unsigned Searcher::FindNeighbours(const Node * n, FPosition * Buf) const
 	{
 		for (unsigned j = 0; j < 3; j += 2)
 		{
-			int dx = i == 0 ? -skip : skip;
-			int dy = j == 0 ? -skip : skip;
+			int dx = i == 0 ? -cskip : cskip;
+			int dy = j == 0 ? -cskip : cskip;
 
 			if (b[i][j][1])
 			{
@@ -1659,8 +1667,8 @@ inline unsigned Searcher::FindNeighbours(const Node * n, FPosition * Buf) const
 	{
 		for (unsigned j = 0; j < 3; j += 2)
 		{
-			int dx = i == 0 ? -skip : skip;
-			int dz = j == 0 ? -skip : skip;
+			int dx = i == 0 ? -cskip : cskip;
+			int dz = j == 0 ? -cskip : cskip;
 
 			if (b[i][1][j])
 			{
@@ -1713,8 +1721,8 @@ inline unsigned Searcher::FindNeighbours(const Node * n, FPosition * Buf) const
 	{
 		for (unsigned j = 0; j < 3; j += 2)
 		{
-			int dy = i == 0 ? -skip : skip;
-			int dz = j == 0 ? -skip : skip;
+			int dy = i == 0 ? -cskip : cskip;
+			int dz = j == 0 ? -cskip : cskip;
 
 			if (b[1][i][j])
 			{
@@ -1785,12 +1793,12 @@ inline unsigned Searcher::FindNeighbours(const Node * n, FPosition * Buf) const
 	{
 		for (unsigned j = 0; j < 3; j += 2)
 		{
-			int dx = i == 0 ? -skip : skip;
-			int dy = j == 0 ? -skip : skip;
+			int dx = i == 0 ? -cskip : cskip;
+			int dy = j == 0 ? -cskip : cskip;
 
-			if (b[i][j][0] && grid(x + dx, y + dy, z - skip))
+			if (b[i][j][0] && grid(x + dx, y + dy, z - cskip))
 			{
-				addToBuf(x + dx, y + dy, z - skip, p);
+				addToBuf(x + dx, y + dy, z - cskip, p);
 			}
 		}
 	}
@@ -1799,12 +1807,12 @@ inline unsigned Searcher::FindNeighbours(const Node * n, FPosition * Buf) const
 	{
 		for (unsigned j = 0; j < 3; j += 2)
 		{
-			int dx = i == 0 ? -skip : skip;
-			int dy = j == 0 ? -skip : skip;
+			int dx = i == 0 ? -cskip : cskip;
+			int dy = j == 0 ? -cskip : cskip;
 
-			if (b[i][j][2] && grid(x + dx, y + dy, z + skip))
+			if (b[i][j][2] && grid(x + dx, y + dy, z + cskip))
 			{
-				addToBuf(x + dx, y + dy, z + skip, p);
+				addToBuf(x + dx, y + dy, z + cskip, p);
 			}
 		}
 	}
@@ -1828,7 +1836,7 @@ inline FPosition Searcher::Jump(const FPosition & Cur, const FPosition & Src)
 	}
 
 	int dx = Cur.x - Src.x;
-	int dy = Cur.x - Src.y;
+	int dy = Cur.y - Src.y;
 	int dz = Cur.z - Src.z;
 
 	JPS_ASSERT(dx || dy || dz);
@@ -1900,5 +1908,7 @@ inline PositionVector Searcher::BacktracePath(const Node * tail) const
 #ifdef JPS_DEBUG
 #undef JPS_DEBUG
 #endif
+
+}
 
 #endif
